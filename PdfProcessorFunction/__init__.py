@@ -2,12 +2,8 @@ import logging
 import json
 import os
 import io
-from PyPDF2 import PdfReader, PdfWriter
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from pypdf import PdfReader, PdfWriter
 import azure.functions as func
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sharepoint_graph_utils import get_access_token, download_pdf_from_sharepoint, upload_pdf_to_sharepoint
 
 

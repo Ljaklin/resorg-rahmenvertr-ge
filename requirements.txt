@@ -1,4 +1,4 @@
 azure-functions
 requests
-PyPDF2
+pypdf
 reportlab
