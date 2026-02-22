@@ -1,0 +1,83 @@
+import logging
+import json
+import os
+import io
+from pypdf import PdfReader, PdfWriter
+import azure.functions as func
+from sharepoint_graph_utils import get_access_token, download_pdf_from_sharepoint, upload_pdf_to_sharepoint
+
+
+def fill_pdf_fields(pdf_content, field_data):
+    reader = PdfReader(io.BytesIO(pdf_content))
+    writer = PdfWriter()
+    
+    for page in reader.pages:
+        writer.add_page(page)
+    
+    if "/AcroForm" in reader.trailer["/Root"]:
+        writer.update_page_form_field_values(writer.pages[0], field_data)
+    
+    output = io.BytesIO()
+    writer.write(output)
+    output.seek(0)
+    return output.getvalue()
+
+
+def main(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('PDF processor function triggered')
+
+    try:
+        req_body = req.get_json()
+    except ValueError:
+        return func.HttpResponse(
+            "Invalid JSON in request body",
+            status_code=400
+        )
+
+    source_folder = req_body.get('source_folder', '/Documents/Templates')
+    source_filename = req_body.get('source_filename', 'template.pdf')
+    dest_folder = req_body.get('dest_folder', '/Documents/Processed')
+    dest_filename = req_body.get('dest_filename', 'filled_document.pdf')
+    field_data = req_body.get('field_data', {})
+
+    tenant_id = os.getenv("tenant_id")
+    client_id = os.getenv("client_id")
+    client_secret = os.getenv("client_secret")
+    site_url = os.getenv("site_url")
+    resource = os.getenv("resource")
+
+    if not all([tenant_id, client_id, client_secret, site_url, resource]):
+        return func.HttpResponse(
+            "Missing required environment variables",
+            status_code=500
+        )
+
+    try:
+        access_token = get_access_token(tenant_id, client_id, client_secret, resource)
+        
+        pdf_content = download_pdf_from_sharepoint(
+            access_token, site_url, source_folder, source_filename
+        )
+        
+        filled_pdf = fill_pdf_fields(pdf_content, field_data)
+        
+        upload_pdf_to_sharepoint(
+            access_token, site_url, dest_folder, dest_filename, filled_pdf
+        )
+        
+        return func.HttpResponse(
+            json.dumps({
+                "status": "success",
+                "message": f"PDF processed and saved to {dest_folder}/{dest_filename}"
+            }),
+            mimetype="application/json",
+            status_code=200
+        )
+    
+    except Exception as e:
+        logging.error(f"Error processing PDF: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({"status": "error", "message": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
