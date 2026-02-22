@@ -2,25 +2,28 @@ import logging
 import json
 import os
 import io
-from pypdf import PdfReader, PdfWriter
+import fitz  # pymupdf
 import azure.functions as func
 from sharepoint_graph_utils import get_access_token, download_pdf_from_sharepoint, upload_pdf_to_sharepoint
 
 
 def fill_pdf_fields(pdf_content, field_data):
-    reader = PdfReader(io.BytesIO(pdf_content))
-    writer = PdfWriter()
+    # PDF-Dokument aus Bytes öffnen
+    doc = fitz.open(stream=pdf_content, filetype="pdf")
     
-    for page in reader.pages:
-        writer.add_page(page)
+    # Formularfelder bearbeiten
+    for page in doc:
+        for field in page.widgets():  # Alle Formularfelder auf der Seite durchlaufen
+            if field.field_name in field_data:  # Prüfen, ob das Feld aktualisiert werden soll
+                logging.info(f"Feld gefunden: {field.field_name}, alter Wert: {field.field_value}")
+                field.field_value = field_data[field.field_name]  # Neuen Wert setzen
+                field.update()  # Feld aktualisieren
+                logging.info(f"Neuer Wert: {field_data[field.field_name]}")
     
-    if "/AcroForm" in reader.trailer["/Root"]:
-        writer.update_page_form_field_values(writer.pages[0], field_data)
-    
-    output = io.BytesIO()
-    writer.write(output)
-    output.seek(0)
-    return output.getvalue()
+    # Geändertes PDF als Bytes zurückgeben
+    output = doc.tobytes()
+    doc.close()
+    return output
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
