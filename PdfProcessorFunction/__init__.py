@@ -38,12 +38,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     source_filename = req_body.get('source_filename', 'template.pdf')
     dest_folder = req_body.get('dest_folder', '/Documents/Processed')
     dest_filename = req_body.get('dest_filename', 'filled_document.pdf')
-    
-    field_data = req_body.get('field_data', {
-        'name': 'John Doe',
-        'date': '2024-01-01',
-        'company': 'Acme Corp'
-    })
+    field_data = req_body.get('field_data', {})
 
     tenant_id = os.getenv("tenant_id")
     client_id = os.getenv("client_id")
