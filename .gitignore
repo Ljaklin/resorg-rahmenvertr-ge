@@ -208,3 +208,5 @@ __marimo__/
 
 # Azure Functions
 local.settings.json
+
+.python_packages
