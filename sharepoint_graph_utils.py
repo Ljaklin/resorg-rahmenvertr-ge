@@ -5,7 +5,7 @@ GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 
 def get_access_token(tenant_id, client_id, client_secret, resource):
-    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2/token"
+    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     data = {
         "grant_type": "client_credentials",
         "client_id": client_id,
@@ -45,10 +45,14 @@ def get_drive_by_name(access_token, site_id, library_name):
     url = f"{GRAPH_BASE}/sites/{site_id}/drives"
     response = requests.get(url, headers=_headers(access_token))
     response.raise_for_status()
-    for drive in response.json().get("value", []):
-        if drive["name"] == library_name:
+    drives = response.json().get("value", [])
+    drive_names = [d["name"] for d in drives]
+    logging.info(f"Available libraries on site: {drive_names}")
+    # Case-insensitive match
+    for drive in drives:
+        if drive["name"].lower() == library_name.lower():
             return drive["id"]
-    raise Exception(f"Document library '{library_name}' not found on site.")
+    raise Exception(f"Document library '{library_name}' not found on site. Available: {drive_names}")
 
 
 def list_folder_children(access_token, drive_id, folder_path):
