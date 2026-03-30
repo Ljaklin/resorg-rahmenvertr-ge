@@ -1,7 +1,42 @@
 import logging
 import requests
+import re
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
+
+def sanitize_sharepoint_name(name):
+    """Sanitize a file or folder name for SharePoint compatibility.
+    
+    SharePoint does not allow these characters: " * : < > ? / \ |
+    Also replaces leading/trailing spaces and periods.
+    """
+    if not name:
+        return name
+    
+    # Replace invalid characters with safe alternatives
+    replacements = {
+        '/': '-',
+        '\\': '-',
+        ':': '-',
+        '*': '-',
+        '?': '',
+        '"': "'",
+        '<': '(',
+        '>': ')',
+        '|': '-'
+    }
+    
+    for old_char, new_char in replacements.items():
+        name = name.replace(old_char, new_char)
+    
+    # Remove leading/trailing spaces and periods
+    name = name.strip('. ')
+    
+    # Replace multiple spaces with single space
+    name = re.sub(r'\s+', ' ', name)
+    
+    return name
 
 
 def get_access_token(tenant_id, client_id, client_secret, resource):
@@ -81,11 +116,37 @@ def download_file(access_token, drive_id, item_id):
 
 def upload_file(access_token, drive_id, dest_folder_path, filename, content):
     """Upload a file (up to 4 MB) to a specific folder path in the drive."""
+    # Sanitize the filename
+    filename = sanitize_sharepoint_name(filename)
     encoded_path = requests.utils.quote(f"{dest_folder_path}/{filename}")
     url = f"{GRAPH_BASE}/drives/{drive_id}/root:/{encoded_path}:/content"
     headers = _headers(access_token)
     headers["Content-Type"] = "application/octet-stream"
     response = requests.put(url, headers=headers, data=content)
+    response.raise_for_status()
+    return response.json()
+
+
+def create_folder(access_token, drive_id, parent_path, folder_name):
+    """Create a folder in the specified parent path. Creates the folder even if empty.
+    
+    parent_path: Path to the parent folder (e.g. 'Documents/Project')
+    folder_name: Name of the new folder to create
+    
+    Returns the created folder item dict.
+    """
+    # Sanitize the folder name
+    folder_name = sanitize_sharepoint_name(folder_name)
+    encoded_path = requests.utils.quote(parent_path)
+    url = f"{GRAPH_BASE}/drives/{drive_id}/root:/{encoded_path}:/children"
+    headers = _headers(access_token)
+    headers["Content-Type"] = "application/json"
+    body = {
+        "name": folder_name,
+        "folder": {},
+        "@microsoft.graph.conflictBehavior": "replace"
+    }
+    response = requests.post(url, headers=headers, json=body)
     response.raise_for_status()
     return response.json()
 
@@ -105,15 +166,23 @@ def copy_folder_recursive(access_token, source_drive_id, source_path, dest_drive
     
     for item in children:
         item_name = item["name"]
+        sanitized_name = sanitize_sharepoint_name(item_name)
         
         if "folder" in item:
+            # Explicitly create the folder in destination (handles empty folders too)
+            try:
+                logging.info(f"Creating folder: {dest_path}/{sanitized_name}")
+                create_folder(access_token, dest_drive_id, dest_path, sanitized_name)
+            except Exception as e:
+                logging.warning(f"Folder creation note for {sanitized_name}: {str(e)}")
+            
             # Recurse into subfolder
-            logging.info(f"Entering subfolder: {item_name}")
+            logging.info(f"Entering subfolder: {sanitized_name}")
             sub_result = copy_folder_recursive(
                 access_token, source_drive_id,
                 f"{source_path}/{item_name}",
                 dest_drive_id,
-                f"{dest_path}/{item_name}",
+                f"{dest_path}/{sanitized_name}",
                 pdf_processor=pdf_processor
             )
             result["processed"].extend(sub_result["processed"])
@@ -129,9 +198,9 @@ def copy_folder_recursive(access_token, source_drive_id, source_path, dest_drive
                     logging.info(f"Processing PDF: {item_name}")
                     file_content = pdf_processor(file_content)
                 
-                logging.info(f"Uploading: {item_name} -> {dest_path}/{item_name}")
-                upload_file(access_token, dest_drive_id, dest_path, item_name, file_content)
-                result["processed"].append(f"{dest_path}/{item_name}")
+                logging.info(f"Uploading: {sanitized_name} -> {dest_path}/{sanitized_name}")
+                upload_file(access_token, dest_drive_id, dest_path, sanitized_name, file_content)
+                result["processed"].append(f"{dest_path}/{sanitized_name}")
                 
             except Exception as e:
                 error_msg = f"Error copying {item_name}: {str(e)}"
