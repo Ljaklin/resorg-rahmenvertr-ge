@@ -1,6 +1,8 @@
+import html
 import logging
 import requests
 import re
+from urllib.parse import urlparse, parse_qs, unquote
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
@@ -75,12 +77,17 @@ def get_drive_id(access_token, site_id):
     return response.json()["id"]
 
 
-def get_drive_by_name(access_token, site_id, library_name):
-    """Get a drive ID by document library display name (e.g. 'Templates', 'Documents')."""
+def list_drives(access_token, site_id):
+    """List the document libraries (drives) of a site, including their webUrl."""
     url = f"{GRAPH_BASE}/sites/{site_id}/drives"
     response = requests.get(url, headers=_headers(access_token))
     response.raise_for_status()
-    drives = response.json().get("value", [])
+    return response.json().get("value", [])
+
+
+def get_drive_by_name(access_token, site_id, library_name):
+    """Get a drive ID by document library display name (e.g. 'Templates', 'Documents')."""
+    drives = list_drives(access_token, site_id)
     drive_names = [d["name"] for d in drives]
     logging.info(f"Available libraries on site: {drive_names}")
     # Case-insensitive match
@@ -88,6 +95,86 @@ def get_drive_by_name(access_token, site_id, library_name):
         if drive["name"].lower() == library_name.lower():
             return drive["id"]
     raise Exception(f"Document library '{library_name}' not found on site. Available: {drive_names}")
+
+
+def sharepoint_url_to_server_path(url):
+    """Extract the server-relative path from a SharePoint link as copied from the browser.
+
+    Handles library view links ('.../Forms/AllItems.aspx?id=%2Fsites%2F...%2Ffile.x86'),
+    direct file/folder links ('.../sites/X/Library/folder/file.x86') and links wrapped in
+    rich-text HTML. Returns e.g. '/sites/Projektabwicklung/Templates/LV_Vonovia_Rahmenvertrag.x86'.
+    """
+    match = re.search(r'https?://[^\s"<>]+', html.unescape(url or ""))
+    if not match:
+        raise ValueError(f"No SharePoint URL found in '{url}'")
+    parsed = urlparse(match.group(0))
+
+    query = parse_qs(parsed.query)
+    if "id" in query:
+        server_path = query["id"][0]  # parse_qs already URL-decodes
+    else:
+        server_path = unquote(parsed.path)
+        if "/Forms/" in server_path:  # library view without id = library root
+            server_path = server_path.split("/Forms/")[0]
+    return server_path.rstrip("/")
+
+
+def resolve_sharepoint_url(access_token, site_id, url):
+    """Resolve a SharePoint browser link to (drive_id, path inside the drive).
+    The path is '' for the library root."""
+    server_path = sharepoint_url_to_server_path(url)
+
+    best = None
+    for drive in list_drives(access_token, site_id):
+        drive_path = unquote(urlparse(drive.get("webUrl", "")).path).rstrip("/")
+        if not drive_path:
+            continue
+        if server_path.lower() == drive_path.lower() or server_path.lower().startswith(drive_path.lower() + "/"):
+            if best is None or len(drive_path) > len(best[1]):
+                best = (drive["id"], drive_path)
+
+    if best is None:
+        raise ValueError(f"No document library on this site contains '{server_path}'")
+    drive_id, drive_path = best
+    return drive_id, server_path[len(drive_path):].strip("/")
+
+
+def get_list_items(access_token, site_id, list_name, field_names):
+    """Return the field dicts of all items of a SharePoint list.
+    list_name may be the display name or the URL name of the list (case-insensitive).
+    field_names are internal column names, e.g. 'Bst_x002e__x002d_Nr_x002e_'."""
+    url = f"{GRAPH_BASE}/sites/{site_id}/lists?$select=id,name,displayName"
+    response = requests.get(url, headers=_headers(access_token))
+    response.raise_for_status()
+    lists = response.json().get("value", [])
+    list_id = next(
+        (l["id"] for l in lists
+         if list_name.lower() in (l.get("displayName", "").lower(), l.get("name", "").lower())),
+        None
+    )
+    if list_id is None:
+        raise ValueError(f"SharePoint list '{list_name}' not found on site")
+
+    select = ",".join(field_names)
+    url = f"{GRAPH_BASE}/sites/{site_id}/lists/{list_id}/items?$expand=fields($select={select})&$top=200"
+    items = []
+    while url:
+        response = requests.get(url, headers=_headers(access_token))
+        response.raise_for_status()
+        data = response.json()
+        items.extend(item.get("fields", {}) for item in data.get("value", []))
+        url = data.get("@odata.nextLink")
+    return items
+
+
+def get_item_web_url(access_token, drive_id, item_path):
+    """Return the browser URL SharePoint reports for a file or folder path in a drive.
+    Uses the library's real URL segment, which can differ from its display name."""
+    encoded_path = requests.utils.quote(item_path)
+    url = f"{GRAPH_BASE}/drives/{drive_id}/root:/{encoded_path}?$select=webUrl"
+    response = requests.get(url, headers=_headers(access_token))
+    response.raise_for_status()
+    return response.json()["webUrl"]
 
 
 def list_folder_children(access_token, drive_id, folder_path):
@@ -114,11 +201,21 @@ def download_file(access_token, drive_id, item_id):
     return response.content
 
 
+def download_file_by_path(access_token, drive_id, file_path):
+    """Download a file's content by its path relative to the drive root. Returns bytes."""
+    encoded_path = requests.utils.quote(file_path)
+    url = f"{GRAPH_BASE}/drives/{drive_id}/root:/{encoded_path}:/content"
+    response = requests.get(url, headers=_headers(access_token), allow_redirects=True)
+    response.raise_for_status()
+    return response.content
+
+
 def upload_file(access_token, drive_id, dest_folder_path, filename, content):
     """Upload a file (up to 4 MB) to a specific folder path in the drive."""
     # Sanitize the filename
     filename = sanitize_sharepoint_name(filename)
-    encoded_path = requests.utils.quote(f"{dest_folder_path}/{filename}")
+    file_path = f"{dest_folder_path.strip('/')}/{filename}" if dest_folder_path.strip('/') else filename
+    encoded_path = requests.utils.quote(file_path)
     url = f"{GRAPH_BASE}/drives/{drive_id}/root:/{encoded_path}:/content"
     headers = _headers(access_token)
     headers["Content-Type"] = "application/octet-stream"

@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rahmenvertrag Vorbefüllung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one reading column with a full-width architecture diagram; location sections as labelled tables, each zone keeps its diagram colour */
+:root {
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --fg: #19211f;
+  --muted: #5a6662;
+  --line: #d9e0dd;
+  --sp: #1f6b57;          /* SharePoint zone */
+  --sp-soft: #e2efe9;
+  --az: #2c5a87;          /* Azure zone */
+  --az-soft: #e3ebf4;
+  --pp: #7a3f78;          /* Power Platform zone */
+  --pp-soft: #f1e6f0;
+  --code-bg: #eef2f0;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111614; --surface: #192120; --fg: #e5ebe8; --muted: #9ba7a2; --line: #2a3431;
+    --sp: #6cc5a6; --sp-soft: #1b2e28; --az: #86ade0; --az-soft: #1b2635; --pp: #d59ad2; --pp-soft: #2c1d2b;
+    --code-bg: #1f2826; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111614; --surface: #192120; --fg: #e5ebe8; --muted: #9ba7a2; --line: #2a3431;
+  --sp: #6cc5a6; --sp-soft: #1b2e28; --az: #86ade0; --az-soft: #1b2635; --pp: #d59ad2; --pp-soft: #2c1d2b;
+  --code-bg: #1f2826; color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 48px 72px;
+  display: grid;
+  gap: 56px;
+}
+.prose { max-width: 68ch; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.4rem; font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; }
+.eyebrow {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--muted); font-weight: 600;
+}
+.muted { color: var(--muted); }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--az); }
+a:focus-visible { outline: 2px solid var(--az); outline-offset: 2px; }
+
+header.top { display: grid; gap: 14px; }
+.lede { font-size: 1.08rem; max-width: 64ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  font-size: 0.8rem; border: 1px solid var(--line); background: var(--surface);
+  padding: 3px 10px; border-radius: 999px; color: var(--muted);
+}
+.chip b { color: var(--fg); font-weight: 600; }
+
+section { display: grid; gap: 18px; }
+.section-head { display: grid; gap: 6px; }
+
+/* Diagram */
+.diagram-wrap {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  overflow-x: auto; padding: 12px;
+}
+.diagram-wrap svg { display: block; min-width: 860px; width: 100%; height: auto; }
+svg text { font-family: var(--font-body); fill: var(--fg); }
+svg .t-sub { fill: var(--muted); font-size: 11.5px; }
+svg .t-zone { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
+svg .t-title { font-size: 14px; font-weight: 600; }
+svg .t-mono { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+svg .t-edge { font-size: 11.5px; fill: var(--muted); }
+svg .edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+svg .arrowhead { fill: var(--muted); }
+svg .zone-pp { fill: var(--pp-soft); stroke: var(--pp); }
+svg .zone-az { fill: var(--az-soft); stroke: var(--az); }
+svg .zone-sp { fill: var(--sp-soft); stroke: var(--sp); }
+svg .zone { stroke-width: 1; stroke-dasharray: 4 4; }
+svg .box { fill: var(--surface); stroke-width: 1.5; }
+svg .box-pp { stroke: var(--pp); }
+svg .box-az { stroke: var(--az); }
+svg .box-sp { stroke: var(--sp); }
+svg .lbl-pp { fill: var(--pp); }
+svg .lbl-az { fill: var(--az); }
+svg .lbl-sp { fill: var(--sp); }
+
+/* Flow */
+ol.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: step; }
+ol.flow li {
+  counter-increment: step; display: grid; grid-template-columns: 2rem 1fr; gap: 12px;
+  align-items: start;
+}
+ol.flow li::before {
+  content: counter(step); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 500;
+  width: 1.75rem; height: 1.75rem; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+}
+ol.flow li > div { min-width: 0; padding-top: 2px; }
+
+/* Location blocks */
+.loc {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  display: grid; gap: 14px; padding: 20px 22px; min-width: 0;
+  border-top: 3px solid var(--zone, var(--line));
+}
+.loc.sp { --zone: var(--sp); }
+.loc.az { --zone: var(--az); }
+.loc.pp { --zone: var(--pp); }
+.loc-head { display: grid; gap: 4px; }
+.loc-head .where { font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); overflow-wrap: anywhere; }
+.loc-grid { display: grid; gap: 16px; }
+
+.table-wrap { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; vertical-align: top; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); }
+th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+td.wrap { white-space: normal; }
+
+/* Folder tree */
+.tree {
+  font-family: var(--font-mono); font-size: 0.84rem; line-height: 1.75;
+  background: var(--code-bg); border-radius: 8px; padding: 14px 16px; margin: 0;
+  overflow-x: auto; white-space: pre; color: var(--fg);
+}
+.tree .c { color: var(--muted); }
+.tree .k { color: var(--sp); font-weight: 500; }
+
+.note {
+  font-size: 0.9rem; color: var(--muted); border-left: 2px solid var(--line); padding-left: 12px;
+}
+footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 18px; }
+
+@media (max-width: 640px) {
+  .page { padding-block: 32px 56px; gap: 44px; }
+  h1 { font-size: 1.7rem; }
+  .loc { padding: 16px; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="top">
+    <div class="eyebrow">Azure Function · RESORG Projektabwicklung</div>
+    <h1>Rahmenvertrag Vorbefüllung</h1>
+    <p class="lede">
+      Wird in der Canvas App ein neues Rahmenvertragsprojekt angelegt, richtet diese Funktion den Projektordner in SharePoint ein.
+      Sie kopiert den Musterordner, füllt die PDF-Formulare mit den Projektdaten aus und erstellt zusätzliche Dokumente
+      (z.&nbsp;B. das Vonovia-LV im GAEB-Format), die je Bst.-Nr. in einer SharePoint-Liste hinterlegt sind.
+    </p>
+    <div class="facts">
+      <span class="chip">Funktion <b>RahmenvertragVorbefuellung</b></span>
+      <span class="chip">Python · Functions-Runtime <b>~4</b></span>
+      <span class="chip">Auslöser <b>HTTP POST</b>, Function Key</span>
+      <span class="chip">SharePoint über <b>Microsoft Graph</b></span>
+    </div>
+  </header>
+
+  <section aria-labelledby="arch">
+    <div class="section-head">
+      <div class="eyebrow">Architektur</div>
+      <h2 id="arch">Komponenten und ihr Zusammenspiel</h2>
+    </div>
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 960 420" role="img" aria-label="Die Canvas App ruft die Azure Function auf. Die Funktion holt ein Token von Entra ID und liest über Microsoft Graph Vorlagen und die Konfigurationsliste aus SharePoint. Projektordner und Dokumente schreibt sie in die Bibliothek Rahmenverträge.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" class="arrowhead"/>
+          </marker>
+        </defs>
+
+        <!-- Zones -->
+        <rect x="10" y="40" width="190" height="340" rx="10" class="zone zone-pp"/>
+        <text x="24" y="62" class="t-zone lbl-pp">POWER PLATFORM</text>
+
+        <rect x="230" y="40" width="300" height="340" rx="10" class="zone zone-az"/>
+        <text x="244" y="62" class="t-zone lbl-az">AZURE / ENTRA ID</text>
+
+        <rect x="580" y="20" width="370" height="380" rx="10" class="zone zone-sp"/>
+        <text x="594" y="42" class="t-zone lbl-sp">SHAREPOINT · /sites/Projektabwicklung</text>
+
+        <!-- Canvas app -->
+        <rect x="26" y="160" width="158" height="84" rx="8" class="box box-pp"/>
+        <text x="40" y="190" class="t-title">Canvas App</text>
+        <text x="40" y="210" class="t-sub">erfasst Projektdaten</text>
+        <text x="40" y="227" class="t-sub">öffnet folder_url</text>
+
+        <!-- Function -->
+        <rect x="262" y="140" width="236" height="110" rx="8" class="box box-az"/>
+        <text x="278" y="168" class="t-title">Azure Function</text>
+        <text x="278" y="186" class="t-mono">RahmenvertragVorbefuellung</text>
+        <text x="278" y="208" class="t-sub">kopiert Musterordner, füllt PDFs,</text>
+        <text x="278" y="225" class="t-sub">erstellt konfigurierte Dokumente</text>
+
+        <!-- Entra -->
+        <rect x="262" y="300" width="236" height="62" rx="8" class="box box-az"/>
+        <text x="278" y="326" class="t-title">App-Registrierung (Entra ID)</text>
+        <text x="278" y="345" class="t-sub">Client Credentials → Graph-Token</text>
+
+        <!-- SharePoint boxes -->
+        <rect x="604" y="62" width="322" height="96" rx="8" class="box box-sp"/>
+        <text x="620" y="88" class="t-title">Bibliothek „Templates“</text>
+        <text x="620" y="108" class="t-mono">00.Musterordner Rahmenverträge/</text>
+        <text x="620" y="126" class="t-mono">LV_Vonovia_Rahmenvertrag.x86</text>
+        <text x="620" y="146" class="t-sub">nur lesend</text>
+
+        <rect x="604" y="176" width="322" height="80" rx="8" class="box box-sp"/>
+        <text x="620" y="202" class="t-title">Liste „LV_Vorlagen_Rahmenverträge“</text>
+        <text x="620" y="222" class="t-sub">Bst.-Nr. → Vorlage + Zielordner</text>
+        <text x="620" y="240" class="t-sub">nur lesend</text>
+
+        <rect x="604" y="274" width="322" height="106" rx="8" class="box box-sp"/>
+        <text x="620" y="300" class="t-title">Bibliothek „Rahmenverträge“</text>
+        <text x="620" y="320" class="t-mono">{Auftraggeber} - {Bst.-Nr.}/…</text>
+        <text x="620" y="338" class="t-mono">Vonovia LVs zum Anlegen/</text>
+        <text x="620" y="364" class="t-sub">wird von der Funktion beschrieben</text>
+
+        <!-- Edges -->
+        <path d="M184,186 L258,186" class="edge" marker-end="url(#ah)"/>
+        <text x="190" y="176" class="t-edge">POST JSON</text>
+        <path d="M262,222 L188,222" class="edge" marker-end="url(#ah)"/>
+        <text x="194" y="240" class="t-edge">Ergebnis</text>
+
+        <path d="M380,250 L380,296" class="edge" marker-end="url(#ah)"/>
+        <text x="388" y="278" class="t-edge">Token</text>
+
+        <path d="M498,160 C550,160 560,110 600,110" class="edge" marker-end="url(#ah)"/>
+        <text x="508" y="132" class="t-edge">lesen</text>
+        <path d="M498,195 C550,195 560,216 600,216" class="edge" marker-end="url(#ah)"/>
+        <text x="510" y="190" class="t-edge">lesen</text>
+        <path d="M498,232 C550,232 560,326 600,326" class="edge" marker-end="url(#ah)"/>
+        <text x="502" y="292" class="t-edge">schreiben</text>
+
+        <text x="540" y="412" class="t-edge" text-anchor="middle">Jeder SharePoint-Zugriff läuft über Microsoft Graph</text>
+      </svg>
+    </div>
+
+    <ol class="flow" aria-label="Ablauf eines Aufrufs">
+      <li><div>Die Canvas App sendet die Projektdaten (Adresse, Bst.-Nr., Ang.-Nr., Auftraggeber, Ersteller, …) als JSON an die Funktion.</div></li>
+      <li><div>Die Funktion meldet sich mit dem Client Secret der App-Registrierung bei Entra ID an und erhält ein Microsoft-Graph-Token.</div></li>
+      <li><div>Sie kopiert den Musterordner aus <b>Templates</b> nach <b>Rahmenverträge</b> und füllt die PDF-Formularfelder, deren Namen zu den Feldern der Anfrage passen.</div></li>
+      <li><div>Sie liest <b>LV_Vorlagen_Rahmenverträge</b>. Für jede Zeile mit der Bst.-Nr. aus der Anfrage füllt sie die verlinkte Vorlage aus und speichert sie im verlinkten Zielordner.</div></li>
+      <li><div>Sie gibt den Status, die erstellten Dateien und einen Link auf den neuen Projektordner (<code>folder_url</code>) an die Canvas App zurück.</div></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="where">
+    <div class="section-head">
+      <div class="eyebrow">Was liegt wo</div>
+      <h2 id="where">Ablageorte</h2>
+    </div>
+
+    <div class="loc-grid">
+
+      <article class="loc sp" aria-labelledby="sp-templates">
+        <div class="loc-head">
+          <div class="eyebrow">SharePoint-Bibliothek · lesend</div>
+          <h3 id="sp-templates">Templates</h3>
+          <div class="where">118016aplus.sharepoint.com/sites/Projektabwicklung/Templates</div>
+        </div>
+<pre class="tree"><span class="k">Templates/</span>
+├── <span class="k">00.Musterordner Rahmenverträge/</span>   <span class="c">← wird für jedes Projekt kopiert (App-Einstellung source_folder)</span>
+│   ├── Betriebsanweisung, Arbeitsplan AZ.PDF
+│   ├── Betriebsanweisung, Arbeitsplan Flexplatten.PDF
+│   ├── Deckblatt, Gefährdungsbeurteilung und Aufmaß.pdf
+│   ├── Meldung AZ.pdf
+│   └── Meldung Flexplatten.pdf
+└── LV_Vonovia_Rahmenvertrag.x86          <span class="c">← GAEB-Vorlage, in der Konfigurationsliste verlinkt</span></pre>
+        <p class="note">Unterordner im Musterordner werden mitkopiert. Eine lokale Kopie der PDF-Vorlagen liegt im Repository unter <code>data/</code>.</p>
+      </article>
+
+      <article class="loc sp" aria-labelledby="sp-list">
+        <div class="loc-head">
+          <div class="eyebrow">SharePoint-Liste · lesend</div>
+          <h3 id="sp-list">LV_Vorlagen_Rahmenverträge</h3>
+          <div class="where">118016aplus.sharepoint.com/sites/Projektabwicklung/Lists/LV_Vorlagen_Rahmenvertrge</div>
+        </div>
+        <p class="prose">Eine Zeile je zusätzlichem Dokument. Für einen neuen Rahmenvertrag mit einem bereits unterstützten Dateityp genügt eine neue Zeile, ohne Deployment.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Spalte</th><th>Interner Name</th><th>Inhalt</th></tr></thead>
+            <tbody>
+              <tr><td>Titel</td><td><code>Title</code></td><td class="wrap">Kurzname, wird im Dateinamen verwendet, z.&nbsp;B. <code>Vonovia</code></td></tr>
+              <tr><td>Bst.-Nr.</td><td><code>Bst_x002e__x002d_Nr_x002e_</code></td><td class="wrap">Bst.-Nr., für die die Zeile gilt, z.&nbsp;B. <code>730080</code></td></tr>
+              <tr><td>Vorlage</td><td><code>Vorlage</code></td><td class="wrap">Link auf die Vorlagendatei, aus dem Browser kopiert</td></tr>
+              <tr><td>Zielordner</td><td><code>Zielordner</code></td><td class="wrap">Link auf den Zielordner, aus dem Browser kopiert</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Vorlagentyp</th><th>Was befüllt wird</th></tr></thead>
+            <tbody>
+              <tr><td><code>.x86</code> (GAEB DA XML 3.2)</td><td class="wrap">Baustellenname <code>PrjInfo/LblPrj</code> und LV-Bezeichnung <code>BoQ/BoQInfo/LblBoQ</code> = <code>Stadt (PLZ), Straße, Adresszusatz</code></td></tr>
+              <tr><td><code>.pdf</code></td><td class="wrap">Formularfelder, deren Name einem Feld der Anfrage entspricht</td></tr>
+              <tr><td>sonstige</td><td class="wrap">Werden unverändert kopiert</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="loc sp" aria-labelledby="sp-rv">
+        <div class="loc-head">
+          <div class="eyebrow">SharePoint-Bibliothek · schreibend</div>
+          <h3 id="sp-rv">Rahmenverträge</h3>
+          <div class="where">118016aplus.sharepoint.com/sites/Projektabwicklung/Rahmenvertrge</div>
+        </div>
+<pre class="tree"><span class="k">Rahmenverträge/</span>
+├── <span class="k">{Auftraggeber} - {Bst.-Nr.}/</span>                          <span class="c">z. B. Vonovia - 730080</span>
+│   └── <span class="k">{Stadt}, {Adresse}, {Adresszusatz}, {Ersteller}, {Ang.-Nr.}/</span>
+│       └── … befüllte Kopie des Musterordners              <span class="c">← Link wird als folder_url zurückgegeben</span>
+└── <span class="k">Vonovia LVs zum Anlegen/</span>                              <span class="c">← Zielordner aus der Konfigurationsliste</span>
+    └── {Ang.-Nr.}_Vonovia.x86                             <span class="c">z. B. 01-6767_Vonovia.x86</span></pre>
+        <p class="note">Leere Namensbestandteile entfallen. Zeichen, die SharePoint nicht erlaubt, werden ersetzt. Gleichnamige Ordner und Dateien werden überschrieben.</p>
+      </article>
+
+      <article class="loc az" aria-labelledby="az-func">
+        <div class="loc-head">
+          <div class="eyebrow">Azure · Function App</div>
+          <h3 id="az-func">Funktion und App-Einstellungen</h3>
+          <div class="where">Funktion RahmenvertragVorbefuellung · HTTP POST · Authentifizierung „function“</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>App-Einstellung</th><th>Zweck</th></tr></thead>
+            <tbody>
+              <tr><td><code>tenant_id</code>, <code>client_id</code>, <code>client_secret</code></td><td class="wrap">App-Registrierung in Entra ID, mit der das Graph-Token geholt wird</td></tr>
+              <tr><td><code>resource</code></td><td class="wrap">Präfix des Token-Scopes (Microsoft Graph)</td></tr>
+              <tr><td><code>site_url</code></td><td class="wrap">SharePoint-Site im Graph-Format, <code>118016aplus.sharepoint.com:/sites/Projektabwicklung</code></td></tr>
+              <tr><td><code>source_library</code></td><td class="wrap">Bibliothek mit dem Musterordner (Templates)</td></tr>
+              <tr><td><code>source_folder</code></td><td class="wrap">Musterordner innerhalb dieser Bibliothek</td></tr>
+              <tr><td><code>target_library</code></td><td class="wrap">Bibliothek für die Projektordner (Rahmenverträge)</td></tr>
+              <tr><td><code>template_config_list</code></td><td class="wrap">Optional, Standard ist <code>LV_Vorlagen_Rahmenverträge</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Die App-Registrierung braucht eine Graph-Anwendungsberechtigung, um Templates und die Konfigurationsliste zu lesen und in Rahmenverträge zu schreiben (z.&nbsp;B. <code>Sites.ReadWrite.All</code> oder <code>Sites.Selected</code> mit Freigabe auf die Site).</p>
+      </article>
+
+      <article class="loc az" aria-labelledby="repo">
+        <div class="loc-head">
+          <div class="eyebrow">Quellcode · Git-Repository</div>
+          <h3 id="repo">resorg-rahmenvertr-ge</h3>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Datei</th><th>Inhalt</th></tr></thead>
+            <tbody>
+              <tr><td><code>RahmenvertragVorbefuellung/__init__.py</code></td><td class="wrap">Einstiegspunkt: liest die Anfrage, bildet den Ordnernamen, startet das Kopieren, liest die Konfigurationsliste, baut die Antwort</td></tr>
+              <tr><td><code>RahmenvertragVorbefuellung/function.json</code></td><td class="wrap">HTTP-Trigger (POST, Function Key)</td></tr>
+              <tr><td><code>sharepoint_graph_utils.py</code></td><td class="wrap">Graph-Aufrufe: Token, Site- und Bibliothekssuche, Listeneinträge, Download, Upload, Ordnerkopie, Auflösen von Links</td></tr>
+              <tr><td><code>gaeb_utils.py</code></td><td class="wrap">Befüllen der GAEB-X86-Datei und das Format <code>Stadt (PLZ), Straße, Adresszusatz</code></td></tr>
+              <tr><td><code>inspect_pdf_fields.py</code></td><td class="wrap">Hilfsskript: gibt die Formularfelder der PDFs in <code>data/</code> aus</td></tr>
+              <tr><td><code>data/00.Musterordner Rahmenverträge/</code></td><td class="wrap">Lokale Kopie der PDF-Vorlagen</td></tr>
+              <tr><td><code>README.md</code></td><td class="wrap">Einrichtung, Format von Anfrage und Antwort</td></tr>
+              <tr><td><code>host.json</code>, <code>requirements.txt</code></td><td class="wrap">Konfiguration des Functions-Hosts; Abhängigkeiten <code>azure-functions</code>, <code>requests</code>, <code>pymupdf</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <footer>
+    Stand: 16. November 2026. Die Felder von Anfrage und Antwort sind in <code>README.md</code> im Repository beschrieben.
+  </footer>
+
+</div>
+</body>
+</html>

@@ -4,8 +4,77 @@ import os
 import fitz  # pymupdf
 import azure.functions as func
 from sharepoint_graph_utils import (
-    get_access_token, get_site_id, get_drive_by_name, copy_folder_recursive, sanitize_sharepoint_name
+    get_access_token, get_site_id, get_drive_by_name, get_item_web_url,
+    copy_folder_recursive, sanitize_sharepoint_name, download_file_by_path, upload_file,
+    get_list_items, resolve_sharepoint_url
 )
+from gaeb_utils import build_baustellen_bezeichnung, fill_x86_fields
+
+# SharePoint list that maps a Bst.-Nr. to extra documents (e.g. the Vonovia LV).
+# Columns (internal names): Title, Bst_x002e__x002d_Nr_x002e_ (Bst.-Nr.), Vorlage, Zielordner
+TEMPLATE_CONFIG_LIST = os.getenv("template_config_list", "LV_Vorlagen_Rahmenverträge")
+COL_TITLE = "Title"
+COL_BST_NR = "Bst_x002e__x002d_Nr_x002e_"
+COL_VORLAGE = "Vorlage"
+COL_ZIELORDNER = "Zielordner"
+
+
+def fill_document(filename, content, field_data):
+    """Fill a template depending on its file type. Unknown types are copied unchanged."""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext == ".x86":
+        bezeichnung = build_baustellen_bezeichnung(field_data)
+        if not bezeichnung:
+            raise ValueError("No address given (stadt/adresse or adresse_gesamt)")
+        return fill_x86_fields(content, baustellenname=bezeichnung, lv_bezeichnung=bezeichnung)
+    if ext == ".pdf":
+        return fill_pdf_fields(field_data, content)
+    return content
+
+
+def create_configured_documents(access_token, site_id, field_data):
+    """Create one document per row in the template config list whose Bst.-Nr. matches.
+    Each file is saved as '{ang_nr}_{Titel}{ext}' in the row's Zielordner.
+    Returns (created paths, error messages)."""
+    bst_nr = str(field_data.get('bst_nr') or '').strip()
+    if not bst_nr:
+        return [], []
+
+    rows = get_list_items(
+        access_token, site_id, TEMPLATE_CONFIG_LIST,
+        [COL_TITLE, COL_BST_NR, COL_VORLAGE, COL_ZIELORDNER]
+    )
+    rows = [r for r in rows if str(r.get(COL_BST_NR) or '').strip() == bst_nr]
+    logging.info(f"{len(rows)} template config row(s) for Bst.-Nr. {bst_nr}")
+
+    created, errors = [], []
+    for row in rows:
+        title = (row.get(COL_TITLE) or '').strip()
+        try:
+            ang_nr = str(field_data.get('ang_nr') or '').strip()
+            if not ang_nr:
+                raise ValueError("ang_nr is missing, cannot name the file")
+
+            template_drive, template_path = resolve_sharepoint_url(access_token, site_id, row.get(COL_VORLAGE))
+            target_drive, target_folder = resolve_sharepoint_url(access_token, site_id, row.get(COL_ZIELORDNER))
+
+            template_name = template_path.rsplit("/", 1)[-1]
+            ext = os.path.splitext(template_name)[1]
+            filename = sanitize_sharepoint_name(f"{ang_nr}_{title}{ext}" if title else f"{ang_nr}{ext}")
+
+            content = download_file_by_path(access_token, template_drive, template_path)
+            filled = fill_document(template_name, content, field_data)
+            upload_file(access_token, target_drive, target_folder, filename, filled)
+
+            path = f"{target_folder}/{filename}" if target_folder else filename
+            logging.info(f"Created '{path}' from template '{template_path}'")
+            created.append(path)
+        except Exception as e:
+            error_msg = f"Error creating document '{title}': {str(e)}"
+            logging.error(error_msg)
+            errors.append(error_msg)
+
+    return created, errors
 
 
 def fill_pdf_fields(field_data, pdf_content):
@@ -80,7 +149,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     # --- Build destination folder name ---
-    # Format: "plz, stadt, adresse, adresszusatz, bst.-nr., auftraggeber, ersteller, datum, ang.-nr."
+    # Format: "{auftraggeber} - {bst_nr}/{stadt}, {adresse}, {adresszusatz}, {ersteller}, {ang_nr}"
+    # (empty parts are skipped)
     auftraggeber = field_data.get('auftraggeber', 'Unbekannt')
     bst_nr = field_data.get('bst_nr', '')
     
@@ -129,15 +199,22 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             pdf_processor=pdf_processor
         )
 
-        # --- Construct folder URL for Power Automate ---
-        from urllib.parse import quote
-        site_path = site_url.split(":/")[1]  # Extract "sites/Projektabwicklung"
-        domain = site_url.split(":/")[0]  # Extract "118016aplus.sharepoint.com"
-        
-        # URL-encode the path, keeping forward slashes
-        encoded_path = quote(dest_path, safe="/")
-        folder_url = f"https://{domain}/{site_path}/{target_library}/{encoded_path}"
-        logging.info(f"Created folder URL: {folder_url}")
+        # --- Extra documents per Bst.-Nr. from the template config list (e.g. Vonovia LV) ---
+        try:
+            documents, doc_errors = create_configured_documents(access_token, site_id, field_data)
+        except Exception as e:
+            documents, doc_errors = [], [f"Error reading template config list: {str(e)}"]
+            logging.error(doc_errors[0])
+        result["processed"].extend(documents)
+        result["errors"].extend(doc_errors)
+
+        # --- Folder URL for Power Automate, as reported by SharePoint ---
+        folder_url = None
+        try:
+            folder_url = get_item_web_url(access_token, target_drive_id, dest_path)
+            logging.info(f"Created folder URL: {folder_url}")
+        except Exception as e:
+            logging.warning(f"Could not resolve folder URL for {dest_path}: {str(e)}")
 
         response_data = {
             "status": "success" if result["processed"] else "error",
@@ -145,7 +222,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             "files": result["processed"],
             "destination": dest_path,
             "folder_url": folder_url,
-            "ang_nr": field_data.get('ang_nr')
+            "ang_nr": field_data.get('ang_nr'),
+            "documents": documents
         }
         if result["errors"]:
             response_data["errors"] = result["errors"]
